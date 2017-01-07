@@ -1,0 +1,71 @@
+#!/bin/bash -eu
+
+# Reject commits with binary files or files larger than a certain limit. Allow
+# overriding with a key phrase in the appropriate commit message.
+
+# Use 'strict mode': http://redsymbol.net/articles/unofficial-bash-strict-mode/
+set -o pipefail
+
+nullsha="0000000000000000000000000000000000000000"
+maxsize=1
+maxbytes=$(( $maxsize * 1024 * 1024 ))
+status=0
+# This is the message to include in your commit to override.
+commit_override_msg="override restrictions"
+
+# Read stdin for ref information.
+while read oldref newref refname; do
+    # Skip branch deletions.
+    if [ "$newref" = "$nullsha" ]; then
+        continue
+    fi
+
+    # Set oldref to HEAD if this is branch creation.
+    if [ "$oldref" = "$nullsha" ]; then
+        oldref="HEAD"
+    fi
+
+    # Loop over each commit.
+    for commit in $(git rev-list --objects ${oldref}..${newref} | \
+        git cat-file --batch-check='%(objectname) %(objecttype) %(objectsize) %(rest)' | grep commit | awk '{print $1}'); do
+        # Look for binaries by searching for specific output from git log.
+        binaries=0
+        if [ $(git log --pretty=format:%H -M100% --numstat ${commit}^! | grep -ce "-	-	\w") -gt "0" ]; then
+            binaries=1
+        fi
+        # Look for override message in the commit.
+        override=0
+        if [ $(git log --pretty=format:%B ${commit}^! | grep -ci "${commit_override_msg}") -gt "0" ]; then
+            override=1
+        fi
+        if [ "$binaries" -gt "0" ]; then
+            for file in $(git log --pretty=format:%H --numstat -M100% ${commit}^! | grep -e "-	-	\w" | awk '{print $3}'); do
+                if [ "$override" -gt "0" ]; then
+                    echo "Your push has overridden rejection due to binary files: $file ($commit)"
+                else
+                    status=1
+                    echo "Your push was rejected because it contains binary files: $file ($commit)"
+                fi
+            done
+        else
+            # Loop over each file to search for files larger than our size limit.
+            for file in $(git rev-list --objects ${commit}^! | \
+                git cat-file --batch-check='%(objectname) %(objecttype) %(objectsize) %(rest)' | \
+                    awk -v maxbytes="$maxbytes" '$3 > maxbytes { print $4 }'); do
+                if [ "$override" -gt "0" ]; then
+                    echo "Your push has overridden rejection due to files larger than $maxsize MB: $file ($commit)"
+                else
+                    status=1
+                    echo "Your push was rejected because it contains files larger than $maxsize MB: $file ($commit)"
+                fi
+            done
+        fi
+    done
+done
+
+if [ "$status" -ne "0" ]; then
+    echo
+    echo "You must edit your commits to remove the offending files or seek help from the repo administrators."
+    echo
+fi
+exit $status
