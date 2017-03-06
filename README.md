@@ -13,3 +13,5 @@ https://github.com/avar/pre-receive-reject-binaries
 https://github.com/amacneil/git-banish-large-files
 
 However, because pre-receive hooks cannot be chained (you can only have one at a time), I had to manually write my own to combine the features I wanted from both of the above hooks.
+
+I've also included a bonus pre-commit hook for preventing merge markers (<<<<<<<, >>>>>>>, =======) from being left in a commit. It's careful enough to only check for those symbols at the start of a line, with the exact count, followed by a space or newline. I've considered including this in the pre-receive hook as well but have not yet.
