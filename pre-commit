@@ -7,7 +7,7 @@
 # This simply searches the files that you are about to commit for seven <, >, or
 # = at the beginning of a line, followed by a space or the end of the line.
 
-changed=$(git diff --cached --name-only)
+changed=$(git diff --cached --name-only --diff-filter=ACM)
 
 if [[ -z "$changed" ]]; then
     exit 0
