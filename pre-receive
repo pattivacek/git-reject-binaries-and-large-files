@@ -30,7 +30,7 @@ while read oldref newref refname; do
         git cat-file --batch-check='%(objectname) %(objecttype) %(objectsize) %(rest)' | grep commit | awk '{print $1}'); do
         # Look for binaries by searching for specific output from git log.
         binaries=0
-        if [ $(git log --pretty=format:%H -M100% --numstat ${commit}^! | grep -ce "-	-	\w") -gt "0" ]; then
+        if [ $(git log  --diff-filter=d --pretty=format:%H -M100% --numstat ${commit}^! | grep -ce "-	-	\w") -gt "0" ]; then
             binaries=1
         fi
         # Look for override message in the commit.
@@ -39,7 +39,7 @@ while read oldref newref refname; do
             override=1
         fi
         if [ "$binaries" -gt "0" ]; then
-            for file in $(git log --pretty=format:%H --numstat -M100% ${commit}^! | grep -e "-	-	\w" | awk '{print $3}'); do
+            for file in $(git log  --diff-filter=d --pretty=format:%H --numstat -M100% ${commit}^! | grep -e "-	-	\w" | awk '{print $3}'); do
                 if [ "$override" -gt "0" ]; then
                     echo "Your push has overridden rejection due to binary files: $file ($commit)"
                 else
